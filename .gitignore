@@ -2,3 +2,4 @@ cache/*
 RepoExec/
 predictions/*
 prompts/*
+__pycache__/
