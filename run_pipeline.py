@@ -13,8 +13,6 @@ from build_prompt import BuildPromptWrapper
 from utils import CONSTANTS, CodexTokenizer, FilePathBuilder
 from generate import generate
 
-
-
 def get_repos(base_dir):
     if base_dir == "RepoExec":
         return os.listdir(base_dir)
