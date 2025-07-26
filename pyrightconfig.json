@@ -2,5 +2,6 @@
     "extraPaths": [
         "code-llm-evaluator/src"
     ],
-    "reportUnusedCallResult": "none"
+    "reportUnusedCallResult": "none",
+    "reportArgumentType": "none"
 }

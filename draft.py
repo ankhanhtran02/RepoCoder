@@ -3,6 +3,7 @@ from utils import Tools
 import os
 from collections import defaultdict
 import re
+from datasets import load_dataset
 
 patterns = [r'^.*?"""\n', r"^.*?'\n", r"^.*?'''\n", r'^.*?"\n']
 
@@ -133,12 +134,14 @@ if __name__ == "__main__":
     updated_samples = []
     for sample in data:
         metadata = sample['metadata']
-        metadata['id'] = sample['id']
+        metadata['target_function_prompt'] = sample['target_function_prompt']
+        metadata['function_signature'] = sample['function_signature']
         updated_sample = {
-            "prompt": sample['prompt'],
-            "metadata": metadata
+            'prompt':sample['prompt'],
+            'metadata':metadata
         }
         updated_samples.append(updated_sample)
-    with open("dataset/RepoExec_benchmark.jsonl", "w", encoding="utf-8") as f:
-        for s in updated_samples:
-            f.write(json.dumps(s) + "\n")
+    with open("dataset/RepoExec_benchmark1.jsonl", "w", encoding="utf-8") as f:
+        for v in updated_samples:
+            f.write(json.dumps(v) + "\n")
+    print("Saved to dataset/RepoExec_benchmark1.jsonl")
