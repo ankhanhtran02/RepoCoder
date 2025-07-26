@@ -67,6 +67,8 @@ def run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, 
                 )
             prediction_paths.append(prediction_fn)
 
+            '''Uncomment the code below to generate prompt and code completions for ground-truth mode. Ground-truth generations are used for calculating evaluation metrics in this paper.'''
+
             # mode = CONSTANTS.gt
             # output_file_path = f'prompts/gt-one-gram-ws-{w}-ss-{s}.jsonl'
             # save_fn = f'gt-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
@@ -148,21 +150,21 @@ if __name__ == '__main__':
     parser.add_argument("--num_iter", type=int, default=1, help="Number of RepoCoder runs, not including the first retrieval-generation stage")
     parser.add_argument("--repo_base_dir", type=str, default="RepoExec", help="Path of the directory containing repositories code.")
     parser.add_argument("--benchmark_path", type=str, default="dataset/RepoExec_benchmark.jsonl", help="Path of the benchmark JSONL file")
-    parser.add_argument("--window_sizes", type=int, nargs="+",required=True, help="List of integers")
-    parser.add_argument("--slice_sizes", type=int, nargs="+", required=True, help="List of integers")
+    parser.add_argument("--window_sizes", type=int, nargs="+", required=True, help="List of window sizes (number of code lines per window) for splitting repository files")
+    parser.add_argument("--slice_sizes", type=int, nargs="+", required=True, help="List of slice sizes (number of code lines per slice) for splitting windows")
 
     # Prediction generation args
-    parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-Coder-1.5B-Instruct")
-    parser.add_argument("--max_tokens", type=int, default=2048)
-    parser.add_argument("--batch_size", type=int, default=8)
-    parser.add_argument("--cache_dir", type=str, default="/cache")
-    parser.add_argument("--save_dir", type=str, default="predictions")
-    parser.add_argument("--num_return_sequences", type=int, default=5)
-    parser.add_argument('--do_sample', action="store_true")
-    parser.add_argument('--top_p', type=float, default=0.95)
-    parser.add_argument('--top_k', type=int, default=0)
-    parser.add_argument('--temperature', type=float, default=0.2)
-    parser.add_argument('--repetition_penalty', type=float, default=1.2)
+    parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-Coder-1.5B-Instruct", help="Model name or path for code generation")
+    parser.add_argument("--max_tokens", type=int, default=2048, help="Maximum number of tokens to generate per sample")
+    parser.add_argument("--batch_size", type=int, default=8, help="Batch size for generation")
+    parser.add_argument("--cache_dir", type=str, default="/cache", help="Directory to cache model files")
+    parser.add_argument("--save_dir", type=str, default="predictions", help="Directory to save prediction outputs")
+    parser.add_argument("--num_return_sequences", type=int, default=5, help="Number of sequences to generate per prompt")
+    parser.add_argument('--do_sample', action="store_true", help="Enable sampling for generation (otherwise use greedy decoding), only for distributed generation")
+    parser.add_argument('--top_p', type=float, default=0.95, help="Nucleus sampling probability threshold (top-p)")
+    parser.add_argument('--top_k', type=int, default=0, help="Top-k sampling: number of highest probability tokens to keep")
+    parser.add_argument('--temperature', type=float, default=0.2, help="Sampling temperature for generation")
+    parser.add_argument('--repetition_penalty', type=float, default=1.2, help="Penalty for repeated tokens in generation")
     
     args = parser.parse_args()
     run_repocoder(**vars(args))
