@@ -129,5 +129,16 @@ def create_benchmark_file(input_path, output_path):
             out_file.write(json.dumps(sample) + "\n")
 
 if __name__ == "__main__":
-    data = Tools.load_jsonl("predictions/repocoder-one-gram-ws-20-ss-2_samples.1.jsonl")
-    print(data[0])
+    data = Tools.load_jsonl("dataset/RepoExec_benchmark.jsonl")
+    updated_samples = []
+    for sample in data:
+        metadata = sample['metadata']
+        metadata['id'] = sample['id']
+        updated_sample = {
+            "prompt": sample['prompt'],
+            "metadata": metadata
+        }
+        updated_samples.append(updated_sample)
+    with open("dataset/RepoExec_benchmark.jsonl", "w", encoding="utf-8") as f:
+        for s in updated_samples:
+            f.write(json.dumps(s) + "\n")
