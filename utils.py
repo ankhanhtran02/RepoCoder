@@ -50,7 +50,7 @@ class FilePathBuilder:
 
     @staticmethod
     def gen_first_window_path(repo_base_dir, mode, prediction_path, repo, window_size):
-        prediction_file_name = os.path.basename(prediction_path).replace('.0.jsonl', '')
+        prediction_file_name = os.path.basename(prediction_path).replace(f'.jsonl', '')
         out_path = os.path.join(f'cache/{repo_base_dir}/window/{mode}', f'{prediction_file_name}.{repo}_ws{window_size}.pkl')
         FilePathBuilder.make_needed_dir(out_path)
         return out_path
@@ -167,3 +167,16 @@ class Tools:
     def tokenize(code):
         tokenizer = CodexTokenizer()
         return tokenizer.tokenize(code)
+
+    @staticmethod
+    def format_prediction_file(prediction_fpath, output_fpath):
+        predictions = Tools.load_jsonl(prediction_fpath)
+        with open(output_fpath, 'w', encoding='utf-8') as output_file:
+            for prediction in predictions:
+                new_prediction = {
+                    'task_id': prediction['metadata']['id'],
+                    'prompt': prediction['prompt'],
+                    'response': [p['text'] for p in prediction['choices']]
+                }
+                output_file.write(json.dumps(new_prediction) + "\n")
+

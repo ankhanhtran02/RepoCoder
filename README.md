@@ -60,7 +60,7 @@ We utilize a private library to handle the execution and evaluation of the funct
 # Quickstart
 
 ## Prepare Environment
-First, we should set up a python environment. This code base has been tested under python 3.9.
+First, we should set up a python environment in `RepoCoder` directory. This code base has been tested under python 3.9.
 
 ```bash
 $ conda create -n repocoder python=3.9
@@ -68,11 +68,12 @@ $ conda activate repocoder
 $ pip install -r requirements.txt
 $ cd code-llm-evaluator
 $ pip install -e .
+$ pip install vllm
 $ cd ..
 ```
 
 ## Run the Code Completion
-To output predictions, run commands in `run_repocoder.sh` on your terminal in order.
+To output predictions, run commands in `run_repocoder.sh` on your terminal in order. View `run_pipeline.py` module for more information on arguments.
 
 # Citation
 

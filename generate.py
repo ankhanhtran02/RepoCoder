@@ -70,7 +70,7 @@ def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, s
     print(len(evaluator.dataset['question']))
     print("="*61 )
 
-    evaluator.generate(backend='vllm',
+    prediction_fn = evaluator.generate(backend='vllm',
                     max_tokens=max_tokens,
                     num_return_sequences=num_return_sequences,
                     temperature=temperature,
@@ -78,6 +78,7 @@ def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, s
                     do_sample=do_sample,
                     top_p=top_p,
                     top_k=top_k)
+    return prediction_fn
 
 if __name__ == "__main__":
     generate(

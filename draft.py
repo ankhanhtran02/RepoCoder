@@ -130,18 +130,6 @@ def create_benchmark_file(input_path, output_path):
             out_file.write(json.dumps(sample) + "\n")
 
 if __name__ == "__main__":
-    data = Tools.load_jsonl("dataset/RepoExec_benchmark.jsonl")
-    updated_samples = []
-    for sample in data:
-        metadata = sample['metadata']
-        metadata['target_function_prompt'] = sample['target_function_prompt']
-        metadata['function_signature'] = sample['function_signature']
-        updated_sample = {
-            'prompt':sample['prompt'],
-            'metadata':metadata
-        }
-        updated_samples.append(updated_sample)
-    with open("dataset/RepoExec_benchmark1.jsonl", "w", encoding="utf-8") as f:
-        for v in updated_samples:
-            f.write(json.dumps(v) + "\n")
-    print("Saved to dataset/RepoExec_benchmark1.jsonl")
+    data = Tools.load_pickle("cache/RepoExec/window/r-g/python-string-utils_ws20.pkl")
+    with open('text.txt', 'w', encoding='utf-8') as f:
+        f.write(str(data[0]))

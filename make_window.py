@@ -172,7 +172,10 @@ class BaselineWindowMaker:
                     'end_line_no': line_no,
                     'window_size': self.window_size,
                     'context_start_lineno': context_start_lineno,
-                    'repo': self.repo
+                    'repo': self.repo,
+                    'target_function_prompt': task['metadata']['target_function_prompt'],
+                    'function_signature': task['metadata']['function_signature'],
+                    'id': task['metadata']['id']
                 }
             })
         print(f'build {len(code_windows)} baseline windows for {self.repo} with window size {self.window_size}')
@@ -213,7 +216,10 @@ class GroundTruthWindowMaker:
                     'end_line_no': end_line_no,
                     'window_size': self.window_size,
                     'context_start_lineno': context_start_lineno,
-                    'repo': self.repo
+                    'repo': self.repo,
+                    'target_function_prompt': task['metadata']['target_function_prompt'],
+                    'function_signature': task['metadata']['function_signature'],
+                    'id': task['metadata']['id']
                 }
             })
         print(f'build {len(code_windows)} ground truth windows for {self.repo} with window size {self.window_size}')
