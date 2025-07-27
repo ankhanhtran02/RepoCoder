@@ -137,7 +137,7 @@ def run_repocoder(num_iter, repo_base_dir, benchmark_path, window_sizes, slice_s
         prediction_path_template = prediction_files[0] # Assume that only 1 window size & 1 slice size are used for RepoCoder
         # prediction_path_template = 'predictions/rg-one-gram-ws-20-ss-2_samples.0.jsonl'
         for i in range(1, num_iter + 1):
-            prediction_files = run_RepoCoder_method(i, benchmark_path, repos, window_sizes, slice_sizes, prediction_path_template, repo_base_dir, model, max_tokens, batch_size, cache_dir, save_dir, num_return_sequences, temperature, repetition_penalty, do_sample, top_p, top_k)
+            prediction_files = run_RepoCoder_method(i, benchmark_path, repos, window_sizes, slice_sizes, prediction_path_template, repo_base_dir, model, max_tokens, batch_size, cache_dir, save_dir, 1, temperature, repetition_penalty, do_sample, top_p, top_k)
             prediction_path_template = f"{save_dir}/repocoder-one-gram-ws-{{window_size}}-ss-{{slice_size}}_samples.{i}.jsonl"
     last_iter_fpath = prediction_files[0] # Assume that only 1 window size & 1 slice size are used for RepoCoder
     final_fpath = os.path.join(save_dir, "repoexec.final.generated.jsonl")
