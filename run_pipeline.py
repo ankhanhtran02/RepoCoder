@@ -151,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument("--repo_base_dir", type=str, default="RepoExec", help="Path of the directory containing repositories code.")
     parser.add_argument("--benchmark_path", type=str, default="dataset/RepoExec_benchmark.jsonl", help="Path of the benchmark JSONL file")
     parser.add_argument("--window_sizes", type=int, nargs="+", required=True, help="List of window sizes (number of code lines per window) for splitting repository files")
-    parser.add_argument("--slice_sizes", type=int, nargs="+", required=True, help="List of slice sizes (number of code lines per slice) for splitting windows")
+    parser.add_argument("--slice_sizes", type=int, nargs="+", required=True, help="List of slice sizes (number of slices a window is split into)")
 
     # Prediction generation args
     parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-Coder-1.5B-Instruct", help="Model name or path for code generation")
