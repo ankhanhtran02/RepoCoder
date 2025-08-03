@@ -12,7 +12,7 @@ import json
 import os
 
 class RepoWindowMaker:
-    def __init__(self, repo, window_size, slice_size, repo_base_dir=FilePathBuilder.repo_base_dir):
+    def __init__(self, repo, window_size, slice_size, repo_base_dir=FilePathBuilder.repo_base_dir) -> None:
         self.repo = repo
         self.window_size = window_size
         self.slice_size = slice_size
@@ -153,7 +153,8 @@ class BaselineWindowMaker:
     def build_window(self):
         code_windows = []
         for task in self.tasks:
-            if task['metadata']['task_id'].split('/')[0] != self.repo:
+            task_id_tuple = task['metadata']['task_id'].split('/')
+            if "/".join(task_id_tuple[:-1]) != self.repo:
                 continue
             fpath_tuple = tuple(task['metadata']['fpath_tuple'])
             line_no = task['metadata']['line_no']
@@ -196,7 +197,8 @@ class GroundTruthWindowMaker:
         code_windows = []
         delta_size = self.window_size // 2
         for task in self.tasks:
-            if task['metadata']['task_id'].split('/')[0] != self.repo:
+            task_id_tuple = task['metadata']['task_id'].split('/')
+            if "/".join(task_id_tuple[:-1]) != self.repo:
                 continue
             fpath_tuple = tuple(task['metadata']['fpath_tuple'])
             line_no = task['metadata']['line_no']

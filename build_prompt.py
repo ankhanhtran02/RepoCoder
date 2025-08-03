@@ -7,7 +7,7 @@ import os
 from utils import Tools, FilePathBuilder, CodexTokenizer, CodeGenTokenizer, CONSTANTS
 
 class PromptBuilder:
-    def __init__(self, query_lines_with_retrieval_results, task_path, log_message, tokenizer):
+    def __init__(self, query_lines_with_retrieval_results, task_path, log_message, tokenizer, repo_base_dir):
         self.query_lines_with_retrieval_results = query_lines_with_retrieval_results
         self.log_message = log_message
         if tokenizer == CodexTokenizer:
@@ -20,12 +20,16 @@ class PromptBuilder:
         self.tasks_by_task_id = {task['metadata']['task_id']: task for task in tasks}
         self.seperator = '# ' + '-' * 50
         self.max_examples = 10  # maximum number of examples to be included in the prompt
+        self.repo_base_dir = repo_base_dir
 
     def _make_a_block(self, retrieved_context):
         content, sim_score = retrieved_context
         metadata = content['metadata']
         # put the file path in the comment
-        assert metadata[0]['fpath_tuple'][0] == metadata[0]['repo']
+        if self.repo_base_dir == "RepoExec":
+            assert metadata[0]['fpath_tuple'][0] == metadata[0]['repo']
+        elif self.repo_base_dir == "DevEval":
+            assert "/".join(metadata[0]['fpath_tuple'][:2]) == metadata[0]['repo']
         f_paths = ['/'.join(x['fpath_tuple'][1:]) for x in metadata]
         f_paths_str = '\n'.join([f'# {f_path}' for f_path in f_paths])
         f_path_comment = f'# the below code fragment can be found in:'
@@ -43,12 +47,15 @@ class PromptBuilder:
         content, sim_score = retrieved_context
         metadata = content['metadata']
         # put the file path in the comment
-        assert metadata[0]['fpath_tuple'][0] == metadata[0]['repo']
+        if self.repo_base_dir == "RepoExec":
+            assert metadata[0]['fpath_tuple'][0] == metadata[0]['repo']
+        elif self.repo_base_dir == "DevEval":
+            assert "/".join(metadata[0]['fpath_tuple'][:2]) == metadata[0]['repo']
         f_paths = ['/'.join(x['fpath_tuple'][1:]) for x in metadata]
         f_paths_str = '\n'.join([f'# {f_path}' for f_path in f_paths])
         f_path_comment = f'# the below code fragment can be found in:'
         # put code lines in the comment
-        original_code = Tools.read_code(os.path.join(FilePathBuilder.repo_base_dir, *metadata[0]['fpath_tuple']))
+        original_code = Tools.read_code(os.path.join(self.repo_base_dir, *metadata[0]['fpath_tuple']))
         code_lines = original_code.splitlines()
         end_line_no = metadata[0]['end_line_no']
         window_size = metadata[0]['window_size']
@@ -148,7 +155,7 @@ class BuildPromptWrapper:
             
             query_lines_with_retrieval_results = Tools.load_pickle(retrieval_results)
             log_message = f'repo: {repo}, window: {self.window_size}, slice: {self.slice_size}'
-            worker = PromptBuilder(query_lines_with_retrieval_results, self.task_path, log_message, self.tokenizer)
+            worker = PromptBuilder(query_lines_with_retrieval_results, self.task_path, log_message, self.tokenizer, self.repo_base_dir)
             workers.append(worker)
         lines = []
         for worker in workers:

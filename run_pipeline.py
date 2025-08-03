@@ -17,6 +17,15 @@ from functools import partial
 def get_repos(base_dir):
     if base_dir == "RepoExec":
         return os.listdir(base_dir)
+    if base_dir == "DevEval":
+        categories = os.listdir(base_dir)
+        repos = []
+        for category in categories:
+            category_path = os.path.join(base_dir, category)
+            for repo in os.listdir(category_path):
+                repo_path = os.path.join(category, repo)
+                repos.append(repo_path)
+        return repos
     return []
 
 def make_repo_window(benchmark, repos, window_sizes, slice_sizes, repo_base_dir=FilePathBuilder.repo_base_dir):
@@ -28,17 +37,17 @@ def get_prediction_path(save_dir, i, window_size, slice_size):
 
 
 def run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, repo_base_dir, model, max_tokens, batch_size, cache_dir, save_dir, num_return_sequences, temperature, repetition_penalty, do_sample, top_p, top_k):
-    # build code snippets for all the repositories
-    make_repo_window(None, repos, window_sizes, slice_sizes, repo_base_dir)
-    # build code snippets for vanilla retrieval-augmented approach and ground truth
-    MakeWindowWrapper(benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).window_for_baseline_and_ground()
-    # build vector for vanilla retrieval-augmented approach and ground truth
-    vectorizer = BagOfWords
-    BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_baseline_and_ground_windows()
-    BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_repo_windows()
-    # search code for vanilla retrieval-augmented approach and ground truth
-    CodeSearchWrapper('one-gram', benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).search_baseline_and_ground()
-    # build prompt for vanilla retrieval-augmented approach and ground truth
+    # # build code snippets for all the repositories
+    # make_repo_window(None, repos, window_sizes, slice_sizes, repo_base_dir)
+    # # build code snippets for vanilla retrieval-augmented approach and ground truth
+    # MakeWindowWrapper(benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).window_for_baseline_and_ground()
+    # # build vector for vanilla retrieval-augmented approach and ground truth
+    # vectorizer = BagOfWords
+    # BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_baseline_and_ground_windows()
+    # BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_repo_windows()
+    # # search code for vanilla retrieval-augmented approach and ground truth
+    # CodeSearchWrapper('one-gram', benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).search_baseline_and_ground()
+    # # build prompt for vanilla retrieval-augmented approach and ground truth
     tokenizer = CodexTokenizer
     prediction_paths = []
     for w in window_sizes:
@@ -47,7 +56,7 @@ def run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, 
             output_file_path = f'prompts/rg-one-gram-ws-{w}-ss-{s}.0.jsonl'
             save_fn = f'rg-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
             os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-            BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer).build_first_search_prompt(mode, output_file_path)
+            BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer, repo_base_dir).build_first_search_prompt(mode, output_file_path)
             prediction_fn = generate(
                 data=output_file_path,
                 model=model,
@@ -106,12 +115,12 @@ def run_RepoCoder_method(iter, benchmark, repos, window_sizes, slice_sizes, pred
             last_prediction_path = prediction_path_template.format(window_size=w, slice_size=s)
             prompt_fpath = f'prompts/repocoder-one-gram-ws-{w}-ss-{s}.{iter}.jsonl'
             save_fn = f'repocoder-one-gram-ws-{w}-ss-{s}_samples.{iter}.jsonl'
-            BuildPromptWrapper('one-gram', benchmark, repos, w, s, tokenizer).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
+            BuildPromptWrapper('one-gram', benchmark, repos, w, s, tokenizer, repo_base_dir).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
             prediction_fn = generate(
                 data=prompt_fpath,
                 model=model,
                 split="test",
-                task_name="RepoExec-rg",
+                task_name=f"{repo_base_dir}-rg",
                 max_tokens=max_tokens,
                 batch_size=batch_size,
                 cache_dir=cache_dir,
@@ -127,11 +136,13 @@ def run_RepoCoder_method(iter, benchmark, repos, window_sizes, slice_sizes, pred
             prediction_files.append(prediction_fn)
     return prediction_files
 
-def run_repocoder(num_iter, repo_base_dir, benchmark_path, window_sizes, slice_sizes, model, max_tokens, batch_size, cache_dir, save_dir, num_return_sequences, temperature, repetition_penalty, do_sample, top_p, top_k):
+def run_repocoder(num_iter, repo_base_dir, benchmark_path, window_sizes, slice_sizes, final_fn, model, max_tokens, batch_size, cache_dir, save_dir, num_return_sequences, temperature, repetition_penalty, do_sample, top_p, top_k):
     repos = get_repos(repo_base_dir)
     if not repos:
         print(f"No repositories found in {repo_base_dir}. Please check the directory.")
         return
+    else:
+        print(f"Got {len(repos)} repos. Example: {repos[0]}")
     prediction_files = run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, repo_base_dir, model, max_tokens, batch_size, cache_dir, save_dir, num_return_sequences, temperature, repetition_penalty, do_sample, top_p, top_k)
     if num_iter >= 1:
         prediction_path_template = prediction_files[0] # Assume that only 1 window size & 1 slice size are used for RepoCoder
@@ -140,7 +151,7 @@ def run_repocoder(num_iter, repo_base_dir, benchmark_path, window_sizes, slice_s
             prediction_files = run_RepoCoder_method(i, benchmark_path, repos, window_sizes, slice_sizes, prediction_path_template, repo_base_dir, model, max_tokens, batch_size, cache_dir, save_dir, 1, temperature, repetition_penalty, do_sample, top_p, top_k)
             prediction_path_template = f"{save_dir}/repocoder-one-gram-ws-{{window_size}}-ss-{{slice_size}}_samples.{i}.jsonl"
     last_iter_fpath = prediction_files[0] # Assume that only 1 window size & 1 slice size are used for RepoCoder
-    final_fpath = os.path.join(save_dir, "repoexec.final.generated.jsonl")
+    final_fpath = os.path.join(save_dir, final_fn)
     Tools.format_prediction_file(last_iter_fpath, final_fpath)
     print(f"Saved predictions to {final_fpath}")
 
@@ -152,6 +163,7 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark_path", type=str, default="dataset/RepoExec_benchmark.jsonl", help="Path of the benchmark JSONL file")
     parser.add_argument("--window_sizes", type=int, nargs="+", required=True, help="List of window sizes (number of code lines per window) for splitting repository files")
     parser.add_argument("--slice_sizes", type=int, nargs="+", required=True, help="List of slice sizes (number of slices a window is split into)")
+    parser.add_argument("--final_fn", type=str, default="repoexec.final.generated.jsonl", required=True, help="Final generation file name")
 
     # Prediction generation args
     parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-Coder-1.5B-Instruct", help="Model name or path for code generation")

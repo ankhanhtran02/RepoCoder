@@ -7,6 +7,8 @@ import pickle
 import json
 import tiktoken
 from transformers import AutoTokenizer
+from collections import defaultdict 
+from tqdm import tqdm
 
 class CONSTANTS:
     # regular version for Codex
@@ -179,4 +181,48 @@ class Tools:
                     'response': [p['text'] for p in prediction['choices']]
                 }
                 output_file.write(json.dumps(new_prediction) + "\n")
+
+    @staticmethod
+    def format_deveval_benchmark(original_fpath, output_fpath):
+        samples = Tools.load_jsonl(original_fpath)
+        lines = []
+        repo_dict = defaultdict(int)
+        for sample in tqdm(samples):
+            code_lines = Tools.read_code(f"DevEval/{sample['completion_path']}").splitlines()
+            signature_position = sample["signature_position"]
+            prompt = "\n".join(code_lines[(signature_position[0]-1):signature_position[1]])
+            task_id_number = repo_dict[sample["project_path"]]
+            task_id = sample['project_path'] + "/" + str(task_id_number)
+            body_position = sample["body_position"]
+            ground_truth = "\n".join(code_lines[(body_position[0]-1):body_position[1]])
+            fpath_tuple = sample["completion_path"].split("/")
+            context_start_lineno = signature_position[0] - 1
+            line_no = body_position[0] - 1
+            id = sample["namespace"]
+
+            line = {
+                "prompt":prompt,
+                "metadata":{
+                    "task_id":task_id,
+                    "ground_truth":ground_truth,
+                    "fpath_tuple":fpath_tuple,
+                    "context_start_lineno":context_start_lineno,
+                    "line_no":line_no,
+                    "id":id,
+                    "target_function_prompt":prompt,
+                    "function_signature":prompt
+                }
+            }
+            lines.append(line)
+            
+            repo_dict[sample["project_path"]] += 1
+
+        Tools.dump_jsonl(lines, output_fpath)
+        print(f"Saved benchmark to {output_fpath}")
+            
+
+
+
+
+
 

@@ -3,3 +3,7 @@ RepoExec/
 predictions/*
 prompts/*
 __pycache__/
+DevEval/
+data.jsonl
+data.tar.gz
+Source_Code.tar.gz

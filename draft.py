@@ -130,6 +130,5 @@ def create_benchmark_file(input_path, output_path):
             out_file.write(json.dumps(sample) + "\n")
 
 if __name__ == "__main__":
-    data = Tools.load_pickle("cache/RepoExec/window/r-g/python-string-utils_ws20.pkl")
-    with open('text.txt', 'w', encoding='utf-8') as f:
-        f.write(str(data[0]))
+    data = Tools.load_pickle("cache/DevEval/retrieval/r-g/Text-Processing/feedparser_ws20.feedparser_ws20_slice2.one-gram.top20.pkl")
+    print(data)
