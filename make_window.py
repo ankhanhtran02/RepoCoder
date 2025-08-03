@@ -241,7 +241,8 @@ class PredictionWindowMaker:
         code_windows = []
         delta_size = self.window_size // 2
         for prediction in self.predictions:
-            if prediction['metadata']['task_id'].split('/')[0] != self.repo:
+            task_id_tuple = prediction['metadata']['task_id'].split('/')
+            if "/".join(task_id_tuple[:-1]) != self.repo:
                 continue
             fpath_tuple = tuple(prediction['metadata']['fpath_tuple'])
             line_no = prediction['metadata']['line_no']  # line_no in prediction file starts from 0
