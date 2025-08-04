@@ -74,7 +74,9 @@ $ cd ..
 
 ## Run the Code Completion
 To output predictions for **RepoExec** dataset, run commands in `run_repoexec.sh` on your terminal in order. 
+
 To output predictions for **DevEval** dataset, run commands in `run_deveval.sh` on your terminal in order. 
+
 View `run_pipeline.py` module for more information on arguments.
 
 # Citation
