@@ -6,4 +6,4 @@ rm RepoExec/*.csv
 
 export PYTHONPATH=$PYTHONPATH:code-llm-evaluator/src
 
-python run_pipeline.py --window_sizes 20 --slice_sizes 2 --num_iter 2
+python run_pipeline.py --window_sizes 20 --slice_sizes 2 --num_iter 1 

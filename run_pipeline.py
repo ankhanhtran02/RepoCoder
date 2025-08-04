@@ -39,7 +39,7 @@ def get_prediction_path(save_dir, i, window_size, slice_size):
 def run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, repo_base_dir, model, max_tokens, batch_size, cache_dir, save_dir, num_return_sequences, temperature, repetition_penalty, do_sample, top_p, top_k):
     # # build code snippets for all the repositories
     # make_repo_window(None, repos, window_sizes, slice_sizes, repo_base_dir)
-    # # build code snippets for vanilla retrieval-augmented approach and ground truth
+    # # build code snippets for vanilla retrieval-augmentqed approach and ground truth
     # MakeWindowWrapper(benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).window_for_baseline_and_ground()
     # # build vector for vanilla retrieval-augmented approach and ground truth
     # vectorizer = BagOfWords
@@ -56,12 +56,12 @@ def run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, 
             output_file_path = f'prompts/rg-one-gram-ws-{w}-ss-{s}.0.jsonl'
             save_fn = f'rg-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
             os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-            BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer, repo_base_dir).build_first_search_prompt(mode, output_file_path)
+            # BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer, repo_base_dir).build_first_search_prompt(mode, output_file_path)
             prediction_fn = generate(
                 data=output_file_path,
                 model=model,
                 split="test",
-                task_name="RepoExec-rg",
+                task_name=f"{repo_base_dir}-rg",
                 max_tokens=max_tokens,
                 batch_size=batch_size,
                 cache_dir=cache_dir,
@@ -106,7 +106,7 @@ def run_RepoCoder_method(iter, benchmark, repos, window_sizes, slice_sizes, pred
     os.makedirs(os.path.dirname(prediction_path_template), exist_ok=True)
     MakeWindowWrapper(benchmark, repos, window_sizes, slice_sizes, repo_base_dir).window_for_prediction(mode, prediction_path_template)
     vectorizer = BagOfWords
-    BuildVectorWrapper(benchmark, vectorizer, repos, window_sizes, slice_sizes).vectorize_prediction_windows(mode, prediction_path_template)
+    BuildVectorWrapper(benchmark, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_prediction_windows(mode, prediction_path_template)
     CodeSearchWrapper('one-gram', benchmark, repos, window_sizes, slice_sizes, repo_base_dir).search_prediction(mode, prediction_path_template)
     tokenizer = CodexTokenizer
     prediction_files = []
@@ -170,7 +170,7 @@ if __name__ == '__main__':
     parser.add_argument("--max_tokens", type=int, default=2048, help="Maximum number of tokens to generate per sample")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size for generation")
     parser.add_argument("--cache_dir", type=str, default="/cache", help="Directory to cache model files")
-    parser.add_argument("--save_dir", type=str, default="predictions", help="Directory to save prediction outputs")
+    parser.add_argument("--save_dir", type=str, default="predictions/RepoExec", help="Directory to save prediction outputs")
     parser.add_argument("--num_return_sequences", type=int, default=5, help="Number of sequences to generate per prompt")
     parser.add_argument('--do_sample', action="store_true", help="Enable sampling for generation (otherwise use greedy decoding), only for distributed generation")
     parser.add_argument('--top_p', type=float, default=0.95, help="Nucleus sampling probability threshold (top-p)")

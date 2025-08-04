@@ -146,6 +146,8 @@ class Tools:
         base_dir = repo_base_dir
         pattern = os.path.join(f'{base_dir}/{repo}', "**", "*.py")
         files = glob.glob(pattern, recursive=True)
+        # print(f"Pattern: {pattern}")
+        # print(f"File len: {len(files)}")
 
         skipped_files = []
         loaded_code_files = dict()
@@ -154,6 +156,7 @@ class Tools:
             try:
                 code = Tools.read_code(fname)
                 fpath_tuple = tuple(os.path.normpath(fname).split(os.sep)[len(base_dir_list):])
+                # print(f"Fpath: {fpath_tuple}")
                 loaded_code_files[fpath_tuple]= code
             except Exception as e:
                 skipped_files.append((fname, e))

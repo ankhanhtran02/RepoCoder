@@ -338,5 +338,5 @@ class MakeWindowWrapper:
             prediction_path = prediction_path_template.format(window_size=window_size, slice_size=slice_size)
             for repo in self.repos:
                 window_path_builder = functools.partial(FilePathBuilder.gen_first_window_path, self.repo_base_dir, mode)
-                pred_window_maker = PredictionWindowMaker(repo, window_size, prediction_path, window_path_builder)
+                pred_window_maker = PredictionWindowMaker(repo, window_size, prediction_path, window_path_builder, self.repo_base_dir)
                 pred_window_maker.build_window()
