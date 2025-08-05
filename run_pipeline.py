@@ -37,17 +37,17 @@ def get_prediction_path(save_dir, i, window_size, slice_size):
 
 
 def run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, repo_base_dir, model, max_tokens, batch_size, cache_dir, save_dir, num_return_sequences, temperature, repetition_penalty, do_sample, top_p, top_k):
-    # # build code snippets for all the repositories
-    # make_repo_window(None, repos, window_sizes, slice_sizes, repo_base_dir)
-    # # build code snippets for vanilla retrieval-augmentqed approach and ground truth
-    # MakeWindowWrapper(benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).window_for_baseline_and_ground()
-    # # build vector for vanilla retrieval-augmented approach and ground truth
-    # vectorizer = BagOfWords
-    # BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_baseline_and_ground_windows()
-    # BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_repo_windows()
-    # # search code for vanilla retrieval-augmented approach and ground truth
-    # CodeSearchWrapper('one-gram', benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).search_baseline_and_ground()
-    # # build prompt for vanilla retrieval-augmented approach and ground truth
+    # build code snippets for all the repositories
+    make_repo_window(None, repos, window_sizes, slice_sizes, repo_base_dir)
+    # build code snippets for vanilla retrieval-augmentqed approach and ground truth
+    MakeWindowWrapper(benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).window_for_baseline_and_ground()
+    # build vector for vanilla retrieval-augmented approach and ground truth
+    vectorizer = BagOfWords
+    BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_baseline_and_ground_windows()
+    BuildVectorWrapper(benchmark_path, vectorizer, repos, window_sizes, slice_sizes, repo_base_dir).vectorize_repo_windows()
+    # search code for vanilla retrieval-augmented approach and ground truth
+    CodeSearchWrapper('one-gram', benchmark_path, repos, window_sizes, slice_sizes, repo_base_dir).search_baseline_and_ground()
+    # build prompt for vanilla retrieval-augmented approach and ground truth
     tokenizer = CodexTokenizer
     prediction_paths = []
     for w in window_sizes:
@@ -56,7 +56,7 @@ def run_RG1_and_oracle_method(repos, benchmark_path, window_sizes, slice_sizes, 
             output_file_path = f'prompts/rg-one-gram-ws-{w}-ss-{s}.0.jsonl'
             save_fn = f'rg-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
             os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-            # BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer, repo_base_dir).build_first_search_prompt(mode, output_file_path)
+            BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer, repo_base_dir).build_first_search_prompt(mode, output_file_path)
             prediction_fn = generate(
                 data=output_file_path,
                 model=model,
