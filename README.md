@@ -77,7 +77,13 @@ To output predictions for **RepoExec** dataset, run commands in `run_repoexec.sh
 
 To output predictions for **DevEval** dataset, run commands in `run_deveval.sh` on your terminal in order. 
 
-View `run_pipeline.py` module for more information on arguments.
+To run generate using **OpenAI API**, instead of running the last Python command in either Bash script, run the following commands (in the case of RepoExec):
+```bash
+$ export OPENAI_API_KEY="[YOUR_API_KEY]"
+$ python run_pipeline.py --window_sizes 20 --slice_sizes 2 --num_iter 1 --backend gpt --model gpt-4.1-mini --base_url https://api.openai.com/v1
+```
+
+If necessary, change arguments according to your needs. View `run_pipeline.py` module for more information on arguments.
 
 # Citation
 
