@@ -3,5 +3,8 @@
         "code-llm-evaluator/src"
     ],
     "reportUnusedCallResult": "none",
-    "reportArgumentType": "none"
+    "reportArgumentType": "none",
+    "reportUnannotatedClassAttribute": "none",
+    "reportUninitializedInstanceVariable": "none",
+    "reportCallIssue": "none"
 }

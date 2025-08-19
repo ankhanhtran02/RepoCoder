@@ -44,6 +44,8 @@ from transformers import (
     DataCollatorWithPadding
 )
 
+from openai import OpenAI
+
 try:
     from vllm import LLM, SamplingParams
     from vllm.lora.request import LoRARequest
@@ -80,6 +82,7 @@ class Evaluator:
         batch_size: Optional[int] = 16,
         save_dir: Optional[str] = "./output",
         save_fn: Optional[str] = "output.jsonl",
+        base_url: Optional[str] = None,
     ) -> None:
         self.task = task
         self.TASK_NAME = task.TASK_NAME
@@ -95,6 +98,7 @@ class Evaluator:
         self.cache_dir = cache_dir
         self.save_dir = save_dir
         self.save_fn = save_fn
+        self.base_url = base_url
         os.makedirs(self.save_dir, exist_ok=True)
 
     
@@ -127,9 +131,11 @@ class Evaluator:
         :rtype: List
         """
         print(f"Evaluating task: [{self.TASK_NAME}]")
-        print(f"pt={torch.__version__}, cuda={torch.version.cuda}, nccl={torch.cuda.nccl.version()}")
-        print(f"device compute capabilities={torch.cuda.get_device_capability()}")
-        print(f"pytorch compute capabilities={torch.cuda.get_arch_list()}")
+
+        if backend != 'gpt':
+            print(f"pt={torch.__version__}, cuda={torch.version.cuda}, nccl={torch.cuda.nccl.version()}")
+            print(f"device compute capabilities={torch.cuda.get_device_capability()}")
+            print(f"pytorch compute capabilities={torch.cuda.get_arch_list()}")
         
         gen_config = dict(
             max_tokens=max_tokens,
@@ -149,6 +155,10 @@ class Evaluator:
         elif backend == "tf":
             self._distributed_initialize(**gen_config)
             self._generate_fn = self._distributed_generate
+
+        elif backend == "gpt":
+            self._gpt_initialize(**gen_config)
+            self._generate_fn = self._gpt_generate
 
         else:
             raise NotImplementedError
@@ -204,6 +214,54 @@ class Evaluator:
             
                 json.dump(res, writer)
                 writer.write("\n")
+
+    def _gpt_initialize(
+        self,
+        max_tokens: int,
+        temperature: float,
+        repetition_penalty: float,
+        num_return_sequences: int,
+        do_sample: bool,
+        top_p: float,
+        top_k: int): 
+        assert self.base_url, "Please set base_url for OpenAI API"
+        self.generation_config = dict(
+            max_completion_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            n=num_return_sequences,
+            frequency_penalty=repetition_penalty,
+        )
+        self.client = OpenAI(
+            base_url=self.base_url,   # your server/proxy
+            api_key=os.getenv("OPENAI_API_KEY")
+        )
+
+    def _gpt_generate(self):
+        result = []
+        for batch in tqdm(self.ds_loader, total=len(self.ds_loader), desc="Generating"):
+            gens = []
+            for i, messages in enumerate(batch['question']):
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    **self.generation_config
+                )
+
+                gens_per_prompt = []   
+                for output in response.choices:
+                    generated_code = code_parser(output.message.content, batch['metadata'][i]['target_function_prompt'], batch['metadata'][i]['function_signature'])
+                    gens_per_prompt.append({
+                        "text": generated_code
+                    })
+                gens.append(gens_per_prompt)
+
+            batch['generation'] = gens
+            result.extend(batch['generation'])
+            self.save_result(batch)
+            
+        self.dataset = self.dataset.add_column('generation', result)
+        return self.dataset
     
     def _distributed_initialize(
         self,
@@ -353,6 +411,6 @@ class Evaluator:
         return self.dataset
         
             
-    def evaluate():
+    def evaluate(self):
         pass
     

@@ -12,15 +12,16 @@ system_prompt = """You are a helpful coding assistant."""
 
 
 
-class RepoCoder(TaskBase):
-    def __init__(self, task_name, dataset_path, model_name, split="test", system_prompt= None) -> None:
-        self.TASK_NAME=task_name
-        self.DATASET_NAME_OR_PATH=dataset_path
-        self.split =split
-       
+class RepoCoderTask(TaskBase):
+    def __init__(self, task_name, dataset_path, model_name, backend="vllm", split="test", system_prompt= None) -> None:
+        self.TASK_NAME = task_name
+        self.DATASET_NAME_OR_PATH = dataset_path
+        self.split = split
+        self.backend = backend
         self.system_prompt = system_prompt
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if self.backend == "vllm":
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         super().__init__()
    
     def prepare_dataset(self, *args: Any, **kwargs: Any) -> Any:
@@ -42,19 +43,22 @@ class RepoCoder(TaskBase):
            
             prompt = example["prompt"]
             messages.append({"role": "user", "content": prompt})
-            example['question'] = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-            )
+            if self.backend == "vllm":
+                example['question'] = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+            elif self.backend == "gpt":
+                example["question"] = messages
            
             return example
        
         updated_dataset = dataset.map(_preprocess)
         return updated_dataset
 
-def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, save_dir, save_fn, num_return_sequences, temperature, repetition_penalty, top_k, top_p, do_sample):
-    task = RepoCoder(task_name=task_name, dataset_path=data, split = split, system_prompt= system_prompt, model_name = model)
+def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, save_dir, save_fn, num_return_sequences, temperature, repetition_penalty, top_k, top_p, backend='vllm', base_url=None):
+    task = RepoCoderTask(task_name=task_name, dataset_path=data, split = split, system_prompt= system_prompt, model_name = model, backend=backend)
     os.makedirs(os.path.join(save_dir), exist_ok=True)
     save_dir = save_dir
     evaluator = Evaluator(task=task,
@@ -63,19 +67,21 @@ def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, s
                         save_dir=save_dir,
                         save_fn=save_fn,
                         cache_dir=cache_dir,
-                        trust_remote_code=True)
+                        trust_remote_code=True,
+                        base_url=base_url,
+                        )
    
     print("="*25 + "Test sample" + "="*25)
     print(evaluator.dataset['question'][0])
     print(len(evaluator.dataset['question']))
     print("="*61 )
 
-    prediction_fn = evaluator.generate(backend='vllm',
+    prediction_fn = evaluator.generate(
+                    backend=backend,
                     max_tokens=max_tokens,
                     num_return_sequences=num_return_sequences,
                     temperature=temperature,
                     repetition_penalty=repetition_penalty,
-                    do_sample=do_sample,
                     top_p=top_p,
                     top_k=top_k)
     return prediction_fn
