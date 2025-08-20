@@ -4,6 +4,8 @@
 import os
 import argparse
 from turtle import back
+import time
+import json
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -41,6 +43,8 @@ class RepoCoder:
             return
         else:
             print(f"Got {len(self.repos)} repos. Example: {self.repos[0]}")
+        self.start_time = None
+        self.retrieval_time = None
 
     def get_repos(self) -> list[str]:
         if self.repo_base_dir == "RepoExec":
@@ -64,16 +68,17 @@ class RepoCoder:
         return f"{self.save_dir}/repocoder-one-gram-ws-{window_size}-ss-{slice_size}_samples.{i}.jsonl"
 
     def run_RG1_and_oracle_method(self):
-        # build code snippets for all the repositories
-        self.make_repo_window()
-        # build code snippets for vanilla retrieval-augmentqed approach and ground truth
-        MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_baseline_and_ground()
-        # build vector for vanilla retrieval-augmented approach and ground truth
-        vectorizer = BagOfWords
-        BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
-        BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
-        # search code for vanilla retrieval-augmented approach and ground truth
-        CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
+        # # build code snippets for all the repositories
+        # self.make_repo_window()
+        # # build code snippets for vanilla retrieval-augmentqed approach and ground truth
+        # MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_baseline_and_ground()
+        # # build vector for vanilla retrieval-augmented approach and ground truth
+        self.start_time = time.time()
+        # vectorizer = BagOfWords
+        # BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
+        # BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
+        # # search code for vanilla retrieval-augmented approach and ground truth
+        # CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
         # build prompt for vanilla retrieval-augmented approach and ground truth
         tokenizer = CodexTokenizer
         prediction_paths = []
@@ -144,6 +149,8 @@ class RepoCoder:
                 prompt_fpath = f'prompts/repocoder-one-gram-ws-{w}-ss-{s}.{iter}.jsonl'
                 save_fn = f'repocoder-one-gram-ws-{w}-ss-{s}_samples.{iter}.jsonl'
                 BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
+                if iter == self.num_iter:
+                    self.retrieval_time = time.time() - self.start_time if self.start_time else None
                 prediction_fn = generate(
                     data=prompt_fpath,
                     model=self.model,
@@ -154,7 +161,7 @@ class RepoCoder:
                     cache_dir=self.cache_dir,
                     save_dir=self.save_dir,
                     save_fn=save_fn,
-                    num_return_sequences=self.num_return_sequences,
+                    num_return_sequences=1, # RepoCoder generates only 1 sequence per prompt
                     temperature=self.temperature,
                     repetition_penalty=self.repetition_penalty,
                     top_p=self.top_p,
@@ -177,6 +184,9 @@ class RepoCoder:
         final_fpath = os.path.join(self.save_dir, self.final_fn)
         Tools.format_prediction_file(last_iter_fpath, final_fpath)
         print(f"Saved predictions to {final_fpath}")
+        with open(os.path.join(self.save_dir, "ranking-latency.json"), "w", encoding="utf-8") as f:
+            json.dump({"total_ranking_latency (s)":self.retrieval_time}, f, ensure_ascii=False, indent=4)
+        print(f"Total retrieval time: {self.retrieval_time} seconds")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Arguments to run RepoCoder")

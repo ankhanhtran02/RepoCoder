@@ -215,6 +215,32 @@ class Evaluator:
                 json.dump(res, writer)
                 writer.write("\n")
 
+    def print_token_usage(self, input_tokens: int, output_tokens: int, total_tokens: int):
+        # Accumulate totals
+        self.total_input_tokens += input_tokens
+        self.total_output_tokens += output_tokens
+        self.total_tokens += total_tokens
+
+        # Update tqdm bars
+        self.pbar_input.n = min(self.total_input_tokens, self.limit)
+        self.pbar_input.refresh()
+
+        self.pbar_output.n = min(self.total_output_tokens, self.limit)
+        self.pbar_output.refresh()
+
+        self.pbar_total.n = min(self.total_tokens, self.limit)
+        self.pbar_total.refresh()
+
+        # Compute running total cost
+        self.total_cost = (
+            self.total_input_tokens * self.PRICE_INPUT
+            + self.total_output_tokens * self.PRICE_OUTPUT
+        )
+
+        # Print cost below bars (overwrite in-place)
+        sys.stdout.write(f"\r💰 Total cost so far: ${self.total_cost:,.4f}")
+        sys.stdout.flush()
+
     def _gpt_initialize(
         self,
         max_tokens: int,
@@ -236,6 +262,32 @@ class Evaluator:
             base_url=self.base_url,   # your server/proxy
             api_key=os.getenv("OPENAI_API_KEY")
         )
+        self.limit = 5000000
+        self.PRICE_INPUT = 0.40 / 1_000_000
+        self.PRICE_OUTPUT = 1.60 / 1_000_000
+
+        self.total_input_tokens = 0
+        self.total_output_tokens = 0
+        self.total_tokens = 0
+        self.total_cost = 0.0
+
+        # Create persistent bars
+        tqdm.write("Pricing of GPT-4.1-mini: $0.40 per 1M input tokens, $1.60 per 1M output tokens")
+        self.pbar_input = tqdm(
+            total=self.limit, desc="Input Tokens ",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}", 
+            position=0, leave=True, unit_scale=True
+        )
+        self.pbar_output = tqdm(
+            total=self.limit, desc="Output Tokens",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}",
+            position=1, leave=True, unit_scale=True
+        )
+        self.pbar_total = tqdm(
+            total=self.limit, desc="Total Tokens ",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}",
+            position=2, leave=True, unit_scale=True
+        )
 
     def _gpt_generate(self):
         result = []
@@ -247,7 +299,11 @@ class Evaluator:
                     messages=messages,
                     **self.generation_config
                 )
-
+                self.print_token_usage(
+                    input_tokens=response.usage.prompt_tokens,
+                    output_tokens=response.usage.completion_tokens,
+                    total_tokens=response.usage.total_tokens
+                )
                 gens_per_prompt = []   
                 for output in response.choices:
                     generated_code = code_parser(output.message.content, batch['metadata'][i]['target_function_prompt'], batch['metadata'][i]['function_signature'])
