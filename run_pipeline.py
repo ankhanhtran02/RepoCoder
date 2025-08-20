@@ -145,12 +145,13 @@ class RepoCoder:
         prediction_files = []
         for w in self.window_sizes:
             for s in self.slice_sizes:
+                if iter == self.num_iter:
+                    self.retrieval_time = time.time() - self.start_time if self.start_time else None
                 last_prediction_path = prediction_path_template.format(window_size=w, slice_size=s)
                 prompt_fpath = f'prompts/repocoder-one-gram-ws-{w}-ss-{s}.{iter}.jsonl'
                 save_fn = f'repocoder-one-gram-ws-{w}-ss-{s}_samples.{iter}.jsonl'
                 BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
-                if iter == self.num_iter:
-                    self.retrieval_time = time.time() - self.start_time if self.start_time else None
+
                 prediction_fn = generate(
                     data=prompt_fpath,
                     model=self.model,
