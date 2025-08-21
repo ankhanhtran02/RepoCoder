@@ -100,6 +100,8 @@ class Evaluator:
         self.save_fn = save_fn
         self.base_url = base_url
         os.makedirs(self.save_dir, exist_ok=True)
+        self.save_path = os.path.join(self.save_dir, self.save_fn)
+
 
     
     def generate(self,
@@ -169,7 +171,8 @@ class Evaluator:
         start_time = time.time()
         result = self._generate_fn()
         
-        self.postprocessing(result)
+        if result:
+            self.postprocessing(result)
         
         print("=======  Finished {}  =======".format(self.TASK_NAME))
         print("Completion time: %d s", (time.time() - start_time))
@@ -288,36 +291,49 @@ class Evaluator:
             bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}",
             position=2, leave=True, unit_scale=True
         )
+        if os.path.exists(self.save_path):
+            with open(self.save_path, "r", encoding="utf-8") as f:
+                self.current_id = sum(1 for _ in f)
+                print(f"Found {self.current_id} existing entries in {self.save_path}. Continuing from there.")
+        else:
+            self.current_id = 0
+            print(f"No existing entries found in {self.save_path}. Starting fresh.")
+        self.count = 0
 
     def _gpt_generate(self):
         result = []
         for batch in tqdm(self.ds_loader, total=len(self.ds_loader), desc="Generating"):
             gens = []
+            new_batch = defaultdict(list)
             for i, messages in enumerate(batch['question']):
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=messages,
-                    **self.generation_config
-                )
-                self.print_token_usage(
-                    input_tokens=response.usage.prompt_tokens,
-                    output_tokens=response.usage.completion_tokens,
-                    total_tokens=response.usage.total_tokens
-                )
-                gens_per_prompt = []   
-                for output in response.choices:
-                    generated_code = code_parser(output.message.content, batch['metadata'][i]['target_function_prompt'], batch['metadata'][i]['function_signature'])
-                    gens_per_prompt.append({
-                        "text": generated_code
-                    })
-                gens.append(gens_per_prompt)
+                if self.count >= self.current_id:
+                    response = self.client.chat.completions.create(
+                        model=self.model_name,
+                        messages=messages,
+                        **self.generation_config
+                    )
+                    self.print_token_usage(
+                        input_tokens=response.usage.prompt_tokens,
+                        output_tokens=response.usage.completion_tokens,
+                        total_tokens=response.usage.total_tokens
+                    )
+                    gens_per_prompt = []   
+                    for output in response.choices:
+                        generated_code = code_parser(output.message.content, batch['metadata'][i]['target_function_prompt'], batch['metadata'][i]['function_signature'])
+                        gens_per_prompt.append({
+                            "text": generated_code
+                        })
+                    gens.append(gens_per_prompt)
+                    new_batch['metadata'].append(batch['metadata'][i])
+                    new_batch['question'].append(messages)
+                self.count += 1
 
-            batch['generation'] = gens
-            result.extend(batch['generation'])
-            self.save_result(batch)
-            
-        self.dataset = self.dataset.add_column('generation', result)
-        return self.dataset
+            if gens:
+                new_batch['generation'] = gens
+                result.extend(new_batch['generation'])
+                self.save_result(new_batch)
+        
+        return None
     
     def _distributed_initialize(
         self,

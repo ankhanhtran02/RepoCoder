@@ -45,6 +45,11 @@ class RepoCoder:
             print(f"Got {len(self.repos)} repos. Example: {self.repos[0]}")
         self.start_time = None
         self.retrieval_time = None
+        self.current_iter = self.get_current_iter()
+        if self.current_iter == -1:
+            print("No previous iterations found. Starting from scratch.")
+        else:
+            print(f"Found previous iteration: {self.current_iter}. Continuing from there.")
 
     def get_repos(self) -> list[str]:
         if self.repo_base_dir == "RepoExec":
@@ -68,110 +73,133 @@ class RepoCoder:
         return f"{self.save_dir}/repocoder-one-gram-ws-{window_size}-ss-{slice_size}_samples.{i}.jsonl"
 
     def run_RG1_and_oracle_method(self):
-        # build code snippets for all the repositories
-        self.make_repo_window()
-        # build code snippets for vanilla retrieval-augmentqed approach and ground truth
-        MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_baseline_and_ground()
-        # build vector for vanilla retrieval-augmented approach and ground truth
-        self.start_time = time.time()
-        vectorizer = BagOfWords
-        BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
-        BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
-        # search code for vanilla retrieval-augmented approach and ground truth
-        CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
-        # build prompt for vanilla retrieval-augmented approach and ground truth
-        tokenizer = CodexTokenizer
-        prediction_paths = []
-        for w in self.window_sizes:
-            for s in self.slice_sizes:
-                mode = CONSTANTS.rg
-                output_file_path = f'prompts/rg-one-gram-ws-{w}-ss-{s}.0.jsonl'
-                save_fn = f'rg-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
-                os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-                BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_first_search_prompt(mode, output_file_path)
-                prediction_fn = generate(
-                    data=output_file_path,
-                    model=self.model,
-                    split="test",
-                    task_name=f"{self.repo_base_dir}-rg",
-                    max_tokens=self.max_tokens,
-                    batch_size=self.batch_size,
-                    cache_dir=self.cache_dir,
-                    save_dir=self.save_dir,
-                    save_fn=save_fn,
-                    num_return_sequences=self.num_return_sequences,
-                    temperature=self.temperature,
-                    repetition_penalty=self.repetition_penalty,
-                    top_p=self.top_p,
-                    top_k=self.top_k,
-                    base_url=self.base_url,
-                    backend=self.backend,
-                    )
-                prediction_paths.append(prediction_fn)
+        if self.current_iter <= 0:
+            if self.num_iter == -1:
+                # build code snippets for all the repositories
+                self.make_repo_window()
+                # build code snippets for vanilla retrieval-augmentqed approach and ground truth
+                MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_baseline_and_ground()
+                # build vector for vanilla retrieval-augmented approach and ground truth
+                self.start_time = time.time()
+                vectorizer = BagOfWords
+                BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
+                BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
+                # search code for vanilla retrieval-augmented approach and ground truth
+                CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
+            # build prompt for vanilla retrieval-augmented approach and ground truth
+            tokenizer = CodexTokenizer
+            prediction_paths = []
+            for w in self.window_sizes:
+                for s in self.slice_sizes:
+                    mode = CONSTANTS.rg
+                    output_file_path = f'prompts/rg-one-gram-ws-{w}-ss-{s}.0.jsonl'
+                    save_fn = f'rg-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
+                    os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+                    BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_first_search_prompt(mode, output_file_path)
+                    prediction_fn = generate(
+                        data=output_file_path,
+                        model=self.model,
+                        split="test",
+                        task_name=f"{self.repo_base_dir}-rg",
+                        max_tokens=self.max_tokens,
+                        batch_size=self.batch_size,
+                        cache_dir=self.cache_dir,
+                        save_dir=self.save_dir,
+                        save_fn=save_fn,
+                        num_return_sequences=self.num_return_sequences,
+                        temperature=self.temperature,
+                        repetition_penalty=self.repetition_penalty,
+                        top_p=self.top_p,
+                        top_k=self.top_k,
+                        base_url=self.base_url,
+                        backend=self.backend,
+                        )
+                    prediction_paths.append(prediction_fn)
 
-                '''Uncomment the code below to generate prompt and code completions for ground-truth mode. Ground-truth generations are used for calculating evaluation metrics in this paper.'''
+                    '''Uncomment the code below to generate prompt and code completions for ground-truth mode. Ground-truth generations are used for calculating evaluation metrics in this paper.'''
 
-                # mode = CONSTANTS.gt
-                # output_file_path = f'prompts/gt-one-gram-ws-{w}-ss-{s}.jsonl'
-                # save_fn = f'gt-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
-                # BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer).build_first_search_prompt(mode, output_file_path)
-                # generate(
-                #     data=output_file_path,
-                #     model=model,
-                #     split="test",
-                #     task_name="RepoExec-gt",
-                #     max_tokens=max_tokens,
-                #     batch_size=batch_size,
-                #     cache_dir=cache_dir,
-                #     save_dir=save_dir,
-                #     save_fn=save_fn,
-                #     num_return_sequences=num_return_sequences,
-                #     temperature=temperature,
-                #     repetition_penalty=repetition_penalty,
-                #     do_sample=do_sample,
-                #     top_p=top_p,
-                #     top_k=top_k
-                #     )\
-        return prediction_paths
+                    # mode = CONSTANTS.gt
+                    # output_file_path = f'prompts/gt-one-gram-ws-{w}-ss-{s}.jsonl'
+                    # save_fn = f'gt-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
+                    # BuildPromptWrapper('one-gram', benchmark_path, repos, w, s, tokenizer).build_first_search_prompt(mode, output_file_path)
+                    # generate(
+                    #     data=output_file_path,
+                    #     model=model,
+                    #     split="test",
+                    #     task_name="RepoExec-gt",
+                    #     max_tokens=max_tokens,
+                    #     batch_size=batch_size,
+                    #     cache_dir=cache_dir,
+                    #     save_dir=save_dir,
+                    #     save_fn=save_fn,
+                    #     num_return_sequences=num_return_sequences,
+                    #     temperature=temperature,
+                    #     repetition_penalty=repetition_penalty,
+                    #     do_sample=do_sample,
+                    #     top_p=top_p,
+                    #     top_k=top_k
+                    #     )\
+            return prediction_paths
+        return [f"{self.save_dir}/rg-one-gram-ws-{self.window_sizes[0]}-ss-{self.slice_sizes[0]}_samples.0.jsonl"]
 
     def run_RepoCoder_method(self, iter, prediction_path_template):
-        mode = CONSTANTS.rgrg
-        os.makedirs(os.path.dirname(prediction_path_template), exist_ok=True)
-        MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_prediction(mode, prediction_path_template)
-        vectorizer = BagOfWords
-        BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_prediction_windows(mode, prediction_path_template)
-        CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_prediction(mode, prediction_path_template)
-        tokenizer = CodexTokenizer
-        prediction_files = []
-        for w in self.window_sizes:
-            for s in self.slice_sizes:
-                if iter == self.num_iter:
-                    self.retrieval_time = time.time() - self.start_time if self.start_time else None
-                last_prediction_path = prediction_path_template.format(window_size=w, slice_size=s)
-                prompt_fpath = f'prompts/repocoder-one-gram-ws-{w}-ss-{s}.{iter}.jsonl'
-                save_fn = f'repocoder-one-gram-ws-{w}-ss-{s}_samples.{iter}.jsonl'
-                BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
+        if self.current_iter <= iter:
+            mode = CONSTANTS.rgrg
+            if self.current_iter < iter:
+                os.makedirs(os.path.dirname(prediction_path_template), exist_ok=True)
+                MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_prediction(mode, prediction_path_template)
+                vectorizer = BagOfWords
+                BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_prediction_windows(mode, prediction_path_template)
+                CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_prediction(mode, prediction_path_template)
+            tokenizer = CodexTokenizer
+            prediction_files = []
+            for w in self.window_sizes:
+                for s in self.slice_sizes:
+                    if iter == self.num_iter:
+                        self.retrieval_time = time.time() - self.start_time if self.start_time else None
+                    last_prediction_path = prediction_path_template.format(window_size=w, slice_size=s)
+                    prompt_fpath = f'prompts/repocoder-one-gram-ws-{w}-ss-{s}.{iter}.jsonl'
+                    save_fn = f'repocoder-one-gram-ws-{w}-ss-{s}_samples.{iter}.jsonl'
+                    BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
 
-                prediction_fn = generate(
-                    data=prompt_fpath,
-                    model=self.model,
-                    split="test",
-                    task_name=f"{self.repo_base_dir}-rg",
-                    max_tokens=self.max_tokens,
-                    batch_size=self.batch_size,
-                    cache_dir=self.cache_dir,
-                    save_dir=self.save_dir,
-                    save_fn=save_fn,
-                    num_return_sequences=1, # RepoCoder generates only 1 sequence per prompt
-                    temperature=self.temperature,
-                    repetition_penalty=self.repetition_penalty,
-                    top_p=self.top_p,
-                    top_k=self.top_k,
-                    base_url=self.base_url,
-                    backend=self.backend,
-                    )
-                prediction_files.append(prediction_fn)
-        return prediction_files
+                    prediction_fn = generate(
+                        data=prompt_fpath,
+                        model=self.model,
+                        split="test",
+                        task_name=f"{self.repo_base_dir}-rg",
+                        max_tokens=self.max_tokens,
+                        batch_size=self.batch_size,
+                        cache_dir=self.cache_dir,
+                        save_dir=self.save_dir,
+                        save_fn=save_fn,
+                        num_return_sequences=1, # RepoCoder generates only 1 sequence per prompt
+                        temperature=self.temperature,
+                        repetition_penalty=self.repetition_penalty,
+                        top_p=self.top_p,
+                        top_k=self.top_k,
+                        base_url=self.base_url,
+                        backend=self.backend,
+                        )
+                    prediction_files.append(prediction_fn)
+            return prediction_files
+        return [f"{self.save_dir}/repocoder-one-gram-ws-{self.window_sizes[0]}-ss-{self.slice_sizes[0]}_samples.{iter}.jsonl"]
+
+    def get_current_iter(self) -> int:
+        if os.path.isdir(self.save_dir):
+            files = os.listdir(self.save_dir)
+            if files:
+                for file in files:
+                    if file.endswith('final.generated.jsonl'):
+                        return -1
+                for i in range(self.num_iter, -1, -1):
+                    for file in files:
+                        if file.endswith(f"{i}.jsonl"):
+                            return i
+                return -1
+            else:
+                return -1
+        else:
+            return -1
 
     def run(self):
         prediction_files = self.run_RG1_and_oracle_method()
@@ -197,7 +225,7 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark_path", type=str, default="dataset/RepoExec_benchmark.jsonl", help="Path of the benchmark JSONL file")
     parser.add_argument("--window_sizes", type=int, nargs="+", required=True, help="List of window sizes (number of code lines per window) for splitting repository files")
     parser.add_argument("--slice_sizes", type=int, nargs="+", required=True, help="List of slice sizes (number of slices a window is split into)")
-    parser.add_argument("--final_fn", type=str, default="repoexec.final.generated.jsonl", required=True, help="Final generation file name")
+    parser.add_argument("--final_fn", type=str, default="repoexec.final.generated.jsonl", help="Final generation file name")
 
     # Prediction generation args
     parser.add_argument("--backend", type=str, default="vllm", help="Backend choices: 'vllm' or 'gpt'")
