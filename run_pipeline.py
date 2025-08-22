@@ -74,18 +74,17 @@ class RepoCoder:
 
     def run_RG1_and_oracle_method(self):
         if self.current_iter <= 0:
-            if self.num_iter == -1:
-                # build code snippets for all the repositories
-                self.make_repo_window()
-                # build code snippets for vanilla retrieval-augmentqed approach and ground truth
-                MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_baseline_and_ground()
-                # build vector for vanilla retrieval-augmented approach and ground truth
-                self.start_time = time.time()
-                vectorizer = BagOfWords
-                BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
-                BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
-                # search code for vanilla retrieval-augmented approach and ground truth
-                CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
+            # build code snippets for all the repositories
+            self.make_repo_window()
+            # build code snippets for vanilla retrieval-augmentqed approach and ground truth
+            MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_baseline_and_ground()
+            # build vector for vanilla retrieval-augmented approach and ground truth
+            self.start_time = time.time()
+            vectorizer = BagOfWords
+            BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
+            BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
+            # search code for vanilla retrieval-augmented approach and ground truth
+            CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
             # build prompt for vanilla retrieval-augmented approach and ground truth
             tokenizer = CodexTokenizer
             prediction_paths = []
@@ -145,12 +144,11 @@ class RepoCoder:
     def run_RepoCoder_method(self, iter, prediction_path_template):
         if self.current_iter <= iter:
             mode = CONSTANTS.rgrg
-            if self.current_iter < iter:
-                os.makedirs(os.path.dirname(prediction_path_template), exist_ok=True)
-                MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_prediction(mode, prediction_path_template)
-                vectorizer = BagOfWords
-                BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_prediction_windows(mode, prediction_path_template)
-                CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_prediction(mode, prediction_path_template)
+            os.makedirs(os.path.dirname(prediction_path_template), exist_ok=True)
+            MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_prediction(mode, prediction_path_template)
+            vectorizer = BagOfWords
+            BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_prediction_windows(mode, prediction_path_template)
+            CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_prediction(mode, prediction_path_template)
             tokenizer = CodexTokenizer
             prediction_files = []
             for w in self.window_sizes:
