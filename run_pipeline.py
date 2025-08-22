@@ -74,6 +74,7 @@ class RepoCoder:
 
     def run_RG1_and_oracle_method(self):
         if not os.path.exists(os.path.join("cache", self.repo_base_dir)):
+            print(f"Building code snippets for {self.repo_base_dir} repositories...")
             # build code snippets for all the repositories
             self.make_repo_window()
             # build code snippets for vanilla retrieval-augmentqed approach and ground truth
