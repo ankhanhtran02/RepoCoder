@@ -73,7 +73,7 @@ class RepoCoder:
         return f"{self.save_dir}/repocoder-one-gram-ws-{window_size}-ss-{slice_size}_samples.{i}.jsonl"
 
     def run_RG1_and_oracle_method(self):
-        if self.current_iter <= 0:
+        if not os.path.exists(os.path.join("cache", self.repo_base_dir)):
             # build code snippets for all the repositories
             self.make_repo_window()
             # build code snippets for vanilla retrieval-augmentqed approach and ground truth
@@ -83,7 +83,10 @@ class RepoCoder:
             vectorizer = BagOfWords
             BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
             BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
-            # search code for vanilla retrieval-augmented approach and ground truth
+            # search code for vanilla retrieval-augmented approach and ground 
+        else:
+            print(f"Using cached data from {os.path.join('cache', self.repo_base_dir)}")
+        if self.current_iter <= 0:
             CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
             # build prompt for vanilla retrieval-augmented approach and ground truth
             tokenizer = CodexTokenizer
