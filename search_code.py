@@ -66,8 +66,11 @@ class CodeSearchWorker:
         query_lines_with_retrieved_results = []
         for query_line in self.query_embedding_lines:
             new_line = copy.deepcopy(query_line)
+            previous_latency = new_line['metadata'].get('latency', 0)
+            start_time = time.perf_counter()
             top_k_context = self._find_top_k_context(new_line)
             new_line['top_k_context'] = top_k_context
+            new_line['metadata']['latency'] = time.perf_counter() - start_time + previous_latency
             query_lines_with_retrieved_results.append(new_line)
         Tools.dump_pickle(query_lines_with_retrieved_results, self.output_path)
 

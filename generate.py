@@ -57,7 +57,7 @@ class RepoCoderTask(TaskBase):
         updated_dataset = dataset.map(_preprocess)
         return updated_dataset
 
-def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, save_dir, save_fn, num_return_sequences, temperature, repetition_penalty, top_k, top_p, backend='vllm', base_url=None):
+def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, save_dir, save_fn, num_return_sequences, temperature, repetition_penalty, top_k, top_p, backend='vllm', base_url=None, add_latency=False, resume_last_generation=False):
     task = RepoCoderTask(task_name=task_name, dataset_path=data, split = split, system_prompt= system_prompt, model_name = model, backend=backend)
     os.makedirs(os.path.join(save_dir), exist_ok=True)
     save_dir = save_dir
@@ -69,6 +69,8 @@ def generate(data, model, task_name, split, max_tokens, batch_size, cache_dir, s
                         cache_dir=cache_dir,
                         trust_remote_code=True,
                         base_url=base_url,
+                        add_latency=add_latency,
+                        resume_last_generation=resume_last_generation
                         )
    
     print("="*25 + "Test sample" + "="*25)

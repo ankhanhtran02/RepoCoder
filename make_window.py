@@ -5,7 +5,7 @@ import code
 import itertools
 import functools
 from socket import SOL_ALG
-
+import time
 from utils import Tools, FilePathBuilder, CONSTANTS
 from collections import defaultdict
 import json
@@ -252,12 +252,14 @@ class PredictionWindowMaker:
             start_line_no = max(context_start_lineno, line_no - delta_size)
             for sample in [prediction['choices'][i]['text'] for i in range(len(prediction['choices']))]:
                 # TODO actually only one sample is generated
+                start_time = time.perf_counter()
                 sample_lines = [i for i in sample.splitlines() if i.strip()]
                 new_code_lines = code_lines[:line_no] + sample_lines
                 end_line_no = min(len(new_code_lines), line_no + self.window_size - delta_size)
                 window_lines = [i for i in new_code_lines[start_line_no:end_line_no] if i.strip()]
                 if not window_lines:  # all empty lines
                     continue
+                previous_latency = prediction['metadata'].get('latency', 0) 
                 code_windows.append({
                     'context': '\n'.join(window_lines),
                     'metadata': {
@@ -269,9 +271,11 @@ class PredictionWindowMaker:
                         'end_line_no': end_line_no,
                         'window_size': self.window_size,
                         'context_start_lineno': context_start_lineno,
-                        'repo': self.repo
+                        'repo': self.repo,
+                        'latency': previous_latency + (time.perf_counter() - start_time)
                     }
                 })
+
         print(f'build {len(code_windows)} prediction windows for {self.repo} with window size {self.window_size}')
         output_path = self.window_path_builder(self.prediction_path, self.repo, self.window_size)
         Tools.dump_pickle(code_windows, output_path)
@@ -282,7 +286,6 @@ class MakeWindowWrapper:
         self.repo_base_dir = repo_base_dir
         self.window_sizes = window_sizes
         self.slice_sizes = slice_sizes
-
         self.benchmark = benchmark
 
         if benchmark == CONSTANTS.line_benchmark:

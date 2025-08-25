@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from audioop import add
 import os
 import argparse
 from turtle import back
@@ -43,13 +44,13 @@ class RepoCoder:
             return
         else:
             print(f"Got {len(self.repos)} repos. Example: {self.repos[0]}")
-        self.start_time = None
-        self.retrieval_time = None
         self.current_iter = self.get_current_iter()
         if self.current_iter == -1:
             print("No previous iterations found. Starting from scratch.")
+            self.resume_last_generation = False
         else:
             print(f"Found previous iteration: {self.current_iter}. Continuing from there.")
+            self.resume_last_generation = True
 
     def get_repos(self) -> list[str]:
         if self.repo_base_dir == "RepoExec":
@@ -72,21 +73,37 @@ class RepoCoder:
     def get_prediction_path(self, i, window_size, slice_size):
         return f"{self.save_dir}/repocoder-one-gram-ws-{window_size}-ss-{slice_size}_samples.{i}.jsonl"
 
+    def is_cached(self):
+        cache_path = os.path.join(self.cache_dir, self.repo_base_dir)
+        if os.path.exists(cache_path):
+            dirs = os.listdir(cache_path)
+            if 'retrieval' in dirs and 'vector' in dirs and 'window' in dirs:
+                targets1 = ['r-g', 'gt']
+                targets2 = ['r-g', 'gt', 'repos']
+                retrieve_path = os.path.join(cache_path, 'retrieval')
+                vector_path = os.path.join(cache_path, 'vector')
+                window_path = os.path.join(cache_path, 'window')
+                if all(t in os.listdir(retrieve_path) for t in targets1) and all(t in os.listdir(vector_path) for t in targets2) and all(t in os.listdir(window_path) for t in targets2):
+                    return True
+        return False
+
+
     def run_RG1_and_oracle_method(self):
-        if not os.path.exists(os.path.join("cache", self.repo_base_dir)):
+        vectorizer = BagOfWords
+        if not self.is_cached():
             print(f"Building code snippets for {self.repo_base_dir} repositories...")
             # build code snippets for all the repositories
             self.make_repo_window()
             # build code snippets for vanilla retrieval-augmentqed approach and ground truth
             MakeWindowWrapper(self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).window_for_baseline_and_ground()
-            # build vector for vanilla retrieval-augmented approach and ground truth
-            self.start_time = time.time()
-            vectorizer = BagOfWords
-            BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
+
             BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_repo_windows()
             # search code for vanilla retrieval-augmented approach and ground 
         else:
-            print(f"Using cached data from {os.path.join('cache', self.repo_base_dir)}")
+            print(f"Using cached data from {os.path.join(self.cache_dir, self.repo_base_dir)}")
+        # build vector for vanilla retrieval-augmented approach and ground truth
+        # Start calculate latency from here
+        BuildVectorWrapper(self.benchmark_path, vectorizer, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).vectorize_baseline_and_ground_windows()
         if self.current_iter <= 0:
             CodeSearchWrapper('one-gram', self.benchmark_path, self.repos, self.window_sizes, self.slice_sizes, self.repo_base_dir).search_baseline_and_ground()
             # build prompt for vanilla retrieval-augmented approach and ground truth
@@ -98,7 +115,11 @@ class RepoCoder:
                     output_file_path = f'prompts/rg-one-gram-ws-{w}-ss-{s}.0.jsonl'
                     save_fn = f'rg-one-gram-ws-{w}-ss-{s}_samples.0.jsonl'
                     os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-                    BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_first_search_prompt(mode, output_file_path)
+                    if self.num_iter == 0:
+                        add_latency = False
+                    else:
+                        add_latency = True
+                    BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir, add_latency).build_first_search_prompt(mode, output_file_path)
                     prediction_fn = generate(
                         data=output_file_path,
                         model=self.model,
@@ -116,6 +137,8 @@ class RepoCoder:
                         top_k=self.top_k,
                         base_url=self.base_url,
                         backend=self.backend,
+                        add_latency=add_latency,
+                        resume_last_generation=self.resume_last_generation
                         )
                     prediction_paths.append(prediction_fn)
 
@@ -158,11 +181,13 @@ class RepoCoder:
             for w in self.window_sizes:
                 for s in self.slice_sizes:
                     if iter == self.num_iter:
-                        self.retrieval_time = time.time() - self.start_time if self.start_time else None
+                        add_latency = False
+                    else:
+                        add_latency = True
                     last_prediction_path = prediction_path_template.format(window_size=w, slice_size=s)
                     prompt_fpath = f'prompts/repocoder-one-gram-ws-{w}-ss-{s}.{iter}.jsonl'
                     save_fn = f'repocoder-one-gram-ws-{w}-ss-{s}_samples.{iter}.jsonl'
-                    BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
+                    BuildPromptWrapper('one-gram', self.benchmark_path, self.repos, w, s, tokenizer, self.repo_base_dir, add_latency).build_prediction_prompt(mode, last_prediction_path, prompt_fpath)
 
                     prediction_fn = generate(
                         data=prompt_fpath,
@@ -181,6 +206,8 @@ class RepoCoder:
                         top_k=self.top_k,
                         base_url=self.base_url,
                         backend=self.backend,
+                        add_latency=add_latency,
+                        resume_last_generation=self.resume_last_generation
                         )
                     prediction_files.append(prediction_fn)
             return prediction_files
@@ -215,9 +242,6 @@ class RepoCoder:
         final_fpath = os.path.join(self.save_dir, self.final_fn)
         Tools.format_prediction_file(last_iter_fpath, final_fpath)
         print(f"Saved predictions to {final_fpath}")
-        with open(os.path.join(self.save_dir, "ranking-latency.json"), "w", encoding="utf-8") as f:
-            json.dump({"total_ranking_latency (s)":self.retrieval_time}, f, ensure_ascii=False, indent=4)
-        print(f"Total retrieval time: {self.retrieval_time} seconds")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Arguments to run RepoCoder")
@@ -235,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument("--base_url", type=str, help="Base URL for GPT API, if using a hosted model")
     parser.add_argument("--max_tokens", type=int, default=2048, help="Maximum number of tokens to generate per sample")
     parser.add_argument("--batch_size", type=int, default=8, help="Batch size for generation")
-    parser.add_argument("--cache_dir", type=str, default="/cache", help="Directory to cache model files")
+    parser.add_argument("--cache_dir", type=str, default="cache", help="Directory to cache model files")
     parser.add_argument("--save_dir", type=str, default="predictions/RepoExec", help="Directory to save prediction outputs")
     parser.add_argument("--num_return_sequences", type=int, default=5, help="Number of sequences to generate per prompt")
     parser.add_argument('--top_p', type=float, default=0.95, help="Nucleus sampling probability threshold (top-p)")

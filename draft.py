@@ -130,5 +130,23 @@ def create_benchmark_file(input_path, output_path):
             out_file.write(json.dumps(sample) + "\n")
 
 if __name__ == "__main__":
-    data = Tools.load_pickle("cache/DevEval/retrieval/r-g/Text-Processing/feedparser_ws20.feedparser_ws20_slice2.one-gram.top20.pkl")
-    print(data)
+    data = Tools.load_pickle("cache/RepoExec/vector/r-g/python-string-utils_ws20.one-gram.pkl")
+    print(data[0]['metadata']['latency'])
+
+    data = Tools.load_pickle("cache/RepoExec/retrieval/r-g/python-string-utils_ws20.python-string-utils_ws20_slice2.one-gram.top20.pkl")
+    print(data[0]['metadata']['latency'])
+
+    data = Tools.load_jsonl("prompts/rg-one-gram-ws-20-ss-2.0.jsonl")
+    print(data[0]['metadata']['latency'])
+
+    data = Tools.load_jsonl("predictions/RepoExec/rg-one-gram-ws-20-ss-2_samples.0.jsonl")
+    print(data[0]['metadata']['latency'])
+
+    data = Tools.load_pickle("cache/RepoExec/window/r-g-r-g/rg-one-gram-ws-20-ss-2_samples.0.python-string-utils_ws20.pkl")
+    print(data[0]['metadata']['latency'])
+
+    data = Tools.load_pickle("cache/RepoExec/vector/r-g-r-g/rg-one-gram-ws-20-ss-2_samples.0.python-string-utils_ws20.one-gram.pkl")
+    print(data[0]['metadata']['latency'])
+
+    data = Tools.load_pickle("cache/RepoExec/retrieval/r-g-r-g/rg-one-gram-ws-20-ss-2_samples.0.python-string-utils_ws20.python-string-utils_ws20_slice2.one-gram.top20.pkl")
+    print(data[0]['metadata']['latency'])

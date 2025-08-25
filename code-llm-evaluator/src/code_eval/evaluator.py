@@ -83,6 +83,8 @@ class Evaluator:
         save_dir: Optional[str] = "./output",
         save_fn: Optional[str] = "output.jsonl",
         base_url: Optional[str] = None,
+        add_latency: Optional[bool] = False,
+        resume_last_generation: Optional[bool] = False,
     ) -> None:
         self.task = task
         self.TASK_NAME = task.TASK_NAME
@@ -101,9 +103,13 @@ class Evaluator:
         self.base_url = base_url
         os.makedirs(self.save_dir, exist_ok=True)
         self.save_path = os.path.join(self.save_dir, self.save_fn)
+        self.add_latency = add_latency
+        self.resume_last_generation = resume_last_generation
+        if not self.resume_last_generation:
+            with open(self.save_path, "w") as f:
+                pass
+            print(f"Not resuming last generation. Output file {self.save_path} freshened.")
 
-
-    
     def generate(self,
         backend: Optional[str]="vllm",
         num_return_sequences: Optional[int]=1,
@@ -307,6 +313,9 @@ class Evaluator:
             new_batch = defaultdict(list)
             for i, messages in enumerate(batch['question']):
                 if self.count >= self.current_id:
+                    metadata = batch['metadata'][i]
+                    latency = metadata.get('latency', 0)
+                    start_time = time.perf_counter()
                     response = self.client.chat.completions.create(
                         model=self.model_name,
                         messages=messages,
@@ -324,6 +333,7 @@ class Evaluator:
                             "text": generated_code
                         })
                     gens.append(gens_per_prompt)
+                    batch['metadata'][i]['latency'] = time.perf_counter() - start_time + latency if self.add_latency else latency
                     new_batch['metadata'].append(batch['metadata'][i])
                     new_batch['question'].append(messages)
                 self.count += 1
@@ -346,7 +356,7 @@ class Evaluator:
         top_k: int):
         """Initilize native transformers backend"""
         self.accelerator = Accelerator()
-        generate_args = dict(
+        generate_args: dict[str, float] = dict(
             max_new_tokens=max_tokens,
             num_return_sequences=num_return_sequences,
             temperature=temperature,
@@ -387,6 +397,14 @@ class Evaluator:
         if not self.tokenizer.pad_token:
             print("Set EOS_TOKEN to PAD_TOKEN")
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        if os.path.exists(self.save_path):
+            with open(self.save_path, "r", encoding="utf-8") as f:
+                self.current_id = sum(1 for _ in f)
+                print(f"Found {self.current_id} existing entries in {self.save_path}. Continuing from there.")
+        else:
+            self.current_id = 0
+            print(f"No existing entries found in {self.save_path}. Starting fresh.")
+        self.count = 0
 
     def _distributed_generate(self):
         # ``Accelerate`` distribute data and model
@@ -462,26 +480,34 @@ class Evaluator:
     def _vllm_generate(self):
         result = []
         for batch in tqdm(self.ds_loader, total=len(self.ds_loader), desc="Generating"):
+            start_time = time.perf_counter()
             outputs = self.model.generate(batch['question'], 
                                           self.sampling_params, 
                                           lora_request=self.lora_request)
+            latency = time.perf_counter() - start_time
+            new_batch = defaultdict(list)
             gens = []
             for i, output in enumerate(outputs):
-                gens_per_prompt = []
-                for single_output in output.outputs:
-                    generated_code = code_parser(single_output.text, batch['metadata'][i]['target_function_prompt'], batch['metadata'][i]['function_signature'])
-                    gens_per_prompt.append({
-                        "text": generated_code
-                    })
-                gens.append(gens_per_prompt)
-
-            batch['generation'] = gens
-            result.extend(batch['generation'])
-            self.save_result(batch)
+                if self.count >= self.current_id:
+                    gens_per_prompt = []
+                    for single_output in output.outputs:
+                        generated_code = code_parser(single_output.text, batch['metadata'][i]['target_function_prompt'], batch['metadata'][i]['function_signature'])
+                        gens_per_prompt.append({
+                            "text": generated_code
+                        })
+                    gens.append(gens_per_prompt)
+                    previous_latency = batch['metadata'][i].get('latency', 0)
+                    batch['metadata'][i]['latency'] = latency + previous_latency if self.add_latency else previous_latency
+                    new_batch['metadata'].append(batch['metadata'][i])
+                    new_batch['question'].append(batch['question'][i])
+                self.count += 1
             
-        self.dataset = self.dataset.add_column('generation', result)
-        return self.dataset
-        
+            if gens:
+                new_batch['generation'] = gens
+                result.extend(new_batch['generation'])
+                self.save_result(new_batch)
+            
+        return None
             
     def evaluate(self):
         pass

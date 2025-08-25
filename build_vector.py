@@ -9,8 +9,9 @@ from concurrent.futures import as_completed, ProcessPoolExecutor
 from utils import Tools, FilePathBuilder, CONSTANTS
 
 class BagOfWords:
-    def __init__(self, input_file):
+    def __init__(self, input_file, add_latency=False):
         self.input_file = input_file
+        self.add_latency = add_latency
 
     def build(self):
         print(f'building one gram vector for {self.input_file}')
@@ -24,7 +25,10 @@ class BagOfWords:
             t = tqdm.tqdm(total=len(futures))
             for future in as_completed(futures):
                 line = futures[future]
-                tokenized = future.result()
+                tokenized, latency = future.result()
+                if self.add_latency:
+                    previous_latency = line['metadata'].get('latency', 0)
+                    line['metadata']['latency'] = previous_latency + latency
                 new_lines.append({
                     'context': line['context'],
                     'metadata': line['metadata'],
@@ -55,9 +59,9 @@ class BuildVectorWrapper:
     def vectorize_baseline_and_ground_windows(self):
         for window_size in self.window_sizes:
             for repo in self.repos:
-                builder = self.vector_builder(FilePathBuilder.search_first_window_path(self.repo_base_dir, CONSTANTS.rg, repo, window_size))
+                builder = self.vector_builder(FilePathBuilder.search_first_window_path(self.repo_base_dir, CONSTANTS.rg, repo, window_size), add_latency=True)
                 builder.build()
-                builder = self.vector_builder(FilePathBuilder.search_first_window_path(self.repo_base_dir, CONSTANTS.gt, repo, window_size))
+                builder = self.vector_builder(FilePathBuilder.search_first_window_path(self.repo_base_dir, CONSTANTS.gt, repo, window_size), add_latency=True)
                 builder.build()
 
     def vectorize_prediction_windows(self, mode, prediction_path_template):
@@ -66,7 +70,7 @@ class BuildVectorWrapper:
             for repo in self.repos:
                 window_path = FilePathBuilder.gen_first_window_path(self.repo_base_dir, mode, prediction_path, repo, window_size
                 )
-                builder = self.vector_builder(window_path)
+                builder = self.vector_builder(window_path, add_latency=True)
                 builder.build()
 
 class BuildEmbeddingVector:

@@ -9,6 +9,7 @@ import tiktoken
 from transformers import AutoTokenizer
 from collections import defaultdict 
 from tqdm import tqdm
+import time
 
 class CONSTANTS:
     # regular version for Codex
@@ -170,8 +171,10 @@ class Tools:
 
     @staticmethod
     def tokenize(code):
+        start_time = time.perf_counter()
         tokenizer = CodexTokenizer()
-        return tokenizer.tokenize(code)
+        latency = time.perf_counter() - start_time
+        return tokenizer.tokenize(code), latency
 
     @staticmethod
     def format_prediction_file(prediction_fpath, output_fpath):
@@ -181,7 +184,8 @@ class Tools:
                 new_prediction = {
                     'task_id': prediction['metadata']['id'],
                     'prompt': prediction['prompt'],
-                    'response': [p['text'] for p in prediction['choices']]
+                    'response': [p['text'] for p in prediction['choices']],
+                    'latency': prediction['metadata']['latency']
                 }
                 output_file.write(json.dumps(new_prediction) + "\n")
 

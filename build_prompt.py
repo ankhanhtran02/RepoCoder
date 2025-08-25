@@ -3,11 +3,11 @@
 
 import functools
 import os
-
+import time
 from utils import Tools, FilePathBuilder, CodexTokenizer, CodeGenTokenizer, CONSTANTS
 
 class PromptBuilder:
-    def __init__(self, query_lines_with_retrieval_results, task_path, log_message, tokenizer, repo_base_dir):
+    def __init__(self, query_lines_with_retrieval_results, task_path, log_message, tokenizer, repo_base_dir, add_latency=False):
         self.query_lines_with_retrieval_results = query_lines_with_retrieval_results
         self.log_message = log_message
         if tokenizer == CodexTokenizer:
@@ -21,6 +21,7 @@ class PromptBuilder:
         self.seperator = '# ' + '-' * 50
         self.max_examples = 10  # maximum number of examples to be included in the prompt
         self.repo_base_dir = repo_base_dir
+        self.add_latency = add_latency
 
     def _make_a_block(self, retrieved_context):
         content, sim_score = retrieved_context
@@ -93,6 +94,8 @@ class PromptBuilder:
     def build_2nd_stage_input_file(self, mode):
         new_prompt_lines = []
         for query_line in self.query_lines_with_retrieval_results:
+            latency = query_line['metadata'].get('latency', 0)
+            start_time = time.perf_counter()
             task_id = query_line['metadata']['task_id']
             task = self.tasks_by_task_id[task_id]
             old_prompt = task['prompt']
@@ -116,12 +119,15 @@ class PromptBuilder:
             ]
             new_prompt_line['metadata']['window_size'] = query_line['metadata']['window_size']
             new_prompt_line['metadata']['slice_size'] = chosen_context[0][0]['metadata'][0]['slice_size']
+            if self.add_latency:
+                latency += time.perf_counter() - start_time
+            new_prompt_line['metadata']['latency'] = latency
             new_prompt_lines.append(new_prompt_line)
         print('done! ' + self.log_message)
         return new_prompt_lines
 
 class BuildPromptWrapper:
-    def __init__(self, vectorizer, benchmark, repos, window_size, slice_size, tokenizer, repo_base_dir=FilePathBuilder.repo_base_dir):
+    def __init__(self, vectorizer, benchmark, repos, window_size, slice_size, tokenizer, repo_base_dir=FilePathBuilder.repo_base_dir, add_latency=False):
         if vectorizer == 'one-gram':
             self.vector_path_builder = FilePathBuilder.one_gram_vector_path
         elif vectorizer == 'ada002':
@@ -143,6 +149,7 @@ class BuildPromptWrapper:
         self.benchmark = benchmark
         self.tokenizer = tokenizer
         self.repo_base_dir = repo_base_dir
+        self.add_latency = add_latency
     
     def _run(self, mode, query_window_path_builder, output_file_path):
         workers = []
@@ -155,7 +162,7 @@ class BuildPromptWrapper:
             
             query_lines_with_retrieval_results = Tools.load_pickle(retrieval_results)
             log_message = f'repo: {repo}, window: {self.window_size}, slice: {self.slice_size}'
-            worker = PromptBuilder(query_lines_with_retrieval_results, self.task_path, log_message, self.tokenizer, self.repo_base_dir)
+            worker = PromptBuilder(query_lines_with_retrieval_results, self.task_path, log_message, self.tokenizer, self.repo_base_dir, self.add_latency)
             workers.append(worker)
         lines = []
         for worker in workers:
